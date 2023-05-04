@@ -2,7 +2,7 @@
 
 ## Overview
 
-An online material library for storage and quick access of low resolution materials for background objects in 3D rendering. Accessible at https://material-troll.herokuapp.com.
+An online material library for storage and quick access of low resolution materials for background objects in 3D rendering.
 
 ## Resources
 
