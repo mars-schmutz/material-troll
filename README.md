@@ -64,3 +64,9 @@ Retrieve materials member        | GET    | /materials/*\<id\>*
 Create materials member          | POST   | /materials
 Update materials member          | PUT    | /materials/*\<id\>* 
 Delete materials member          | DELETE | /materials/*\<id\>* 
+
+## Screenshots
+![login](./login.png)
+![materials](./materials.png)
+![details](./details.png)
+![new_material](./new_material.png)
