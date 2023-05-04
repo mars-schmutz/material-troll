@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta http-equiv="X-UA-Compatible" contents="ie=edge">
+        <title>Materialize</title>
+        <link rel="preconnect" href="https://fonts.googleapis.com"> 
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin> 
+        <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Open+Sans:wght@300;600&display=swap" rel="stylesheet">
+        <link rel="stylesheet" href="style.css">
+        <script src="https://kit.fontawesome.com/9d72bb5bed.js" crossorigin="anonymous"></script>
+    </head>
+    <body>
+        <div id="app">
+            <!-- Begin Header -->
+            <div class="header grid-item">
+                <button id="new-material-button" @click="toggleCreateModal" v-if="isLoggedIn">NEW</button>
+                <input id="search-field" v-model="search" placeholder="Search..." v-if="isLoggedIn">
+                <!-- <button id="search-button">SEARCH</button> -->
+            </div>
+            <!-- End Header -->
+
+            <!-- Begin Login -->
+            <div class="auth" v-if="!isLoggedIn">
+                <div class="login" v-if="showLogin">
+                    <div class="login-form">
+                        <h3>Login</h3>
+                        <p>Need an account? click <span class="link" @click="toggleLogin">here</span></p>
+                        <input type="text" v-model="loginUser" placeholder="Username">
+                        <p v-if="errs.username" class="error">{{ errs.username }}</p>
+                        <input type="password" v-model="loginPassword" placeholder="Password">
+                        <p v-if="errs.password" class="error">{{ errs.password }}</p>
+                        <p v-if="errs.login" class="error">{{ errs.login }}</p>
+                        <button @click="login">Login</button>
+                    </div>
+                </div>
+                <div class="register" v-else>
+                    <div class="register-form">
+                        <h3>Register</h3>
+                        <p>Already have an account? click <span class="link" @click="toggleLogin">here</span></p>
+                        <input type="text" v-model="registerUser" placeholder="Username">
+                        <p v-if="errs.username" class="error">{{ errs.username }}</p>
+                        <input type="password" v-model="registerPassword" placeholder="Password">
+                        <p v-if="errs.password" class="error">{{ errs.password }}</p>
+                        <p v-if="errs.uniqueUser" class="error">{{ errs.uniqueUser }}</p>
+                        <p>{{ loginMessage }}</p>
+                        <button @click="register">Register</button>
+                    </div>
+                </div>
+            </div>
+            <!-- End Login -->
+
+            <!-- Begin Tags -->
+            <div class="tags-section">
+                <!-- <p>Tags:</p>
+                <ul>
+                    <li v-for="tag in tag_demo">
+                        <input type="checkbox" class="tag-checkbox" :value="tag" v-model="checked_tags">
+                        {{ tag }}
+                    </li>
+                </ul> -->
+            </div>
+            <!-- End Tags -->
+
+            <!-- Begin Material list -->
+            <template v-if="isLoggedIn" v-cloak>
+                <div id="material-list" v-if="materials.length > 0">
+                    <div class="material" v-for="material in filteredList" :data-id="material._id" @click="toggleDetailsModal($event)">
+                        <div class="thumbnail" :style="{ 'background-image': 'url(' + catchNullThumbnail(material.maps) + ')' }"></div>
+                        <p>{{ material.name }}</p>
+                    </div>
+                </div>
+                <div id="material-list" v-else>
+                    <p>Server not responding</p>
+                    <div class="material" v-for="i in 100">
+                        <div class="thumbnail" style="background-image: url(./logo.png)"></div>
+                        <p>{{ i }}</p>
+                    </div>
+                </div>
+            </template>
+            <!-- End Material list -->
+
+            <!-- Begin Material Details -->
+            <div v-cloak id="material-details" v-if="detailsModalVisible" @click.self="toggleDetailsModal($event)">
+                <div v-if="selectedMat !== null">
+                    <span class="close" @click="toggleDetailsModal($event)">&#9587;</span>
+                    <h1>{{ selectedMat.name }}</h1>
+
+                    <template v-if="!editMode">
+                        <div class="details">
+                            <div class="detail-text">
+                                <p>Resolution: {{ selectedMat.resolution }}</p>
+                                <p>Tags:</p>
+                                <ul>
+                                    <li v-if="selectedMat.tags.length > 0 && selectedMat.tags[0] !== ''" v-for="tag in selectedMat.tags">{{ tag }}</li>
+                                    <li v-else>No tags</li>
+                                </ul>
+                                <p>Workflow: {{ selectedMat.workflow }}</p>
+                            </div>
+                            <div class="detail-preview" :style="{ 'background-image': 'url(' + catchNullThumbnail(selectedMat.maps) + ')' }"></div>
+                        </div>
+                        <div class="maps">
+                            <template v-for="(url, key) in selectedMat.maps">
+                                <!-- need to skip thumbnail as downloadable map -->
+                                <template v-if="key !== 'thumbnail' && url !== null">
+                                    <a class="map-download" :href="'https://material-troll.herokuapp.com/download/' + url" target="_blank"><i class="fa-solid fa-download"></i>{{ key }}</a>
+                                </template>
+                            </template>
+                        </div>
+                        <button id="edit" @click="toggleEditMode">{{ editBtn }}</button>
+                        <button id="delete" @click="deleteMaterial">DELETE</button>
+                    </template>
+
+                    <!-- Begin Edit mode -->
+                    <template v-else>
+                        <form enctype="multipart/form-data">
+                            <fieldset class="form-metadata">
+                                <div class="form-text">
+                                    <div>
+                                        <span>Name:</span>
+                                        <input type="text" v-model="edit_name">
+                                        <p v-if="errs.name" class="error">{{ errs.name }}</p>
+                                    </div>
+                                    <div>
+                                        <span>Resolution</span>
+                                        <select v-model="edit_resolution">
+                                            <option disabled>Choose a resolution</option>
+                                            <option value="1k">1K</option>
+                                            <option value="2k">2K</option>
+                                            <option value="4k">4K</option>
+                                        </select>
+                                        <p v-if="errs.resolution" class="error">{{ errs.resolution }}</p>
+                                    </div>
+                                    <div>
+                                        <span>Tags:</span>
+                                        <input class="long" type="text" v-model="edit_tags">
+                                    </div>
+                                    <div>
+                                        <span>Workflow:</span>
+                                        <select v-model="edit_workflow">
+                                            <option disabled>Choose a workflow</option>
+                                            <option value="metallic">Metallic</option>
+                                            <option value="specular">Specular</option>
+                                        </select>
+                                        <p v-if="errs.workflow" class="error">{{ errs.workflow }}</p>
+                                    </div>
+                                </div>
+                                <div class="form-img">
+                                    <div class="upload-thumbnail">
+                                        <label for="form-thumbnail">
+                                            <img src="thumbnail.png" alt="thumbnail">
+                                        </label>
+                                        <input id="form-thumbnail" type="file" name="thumbnail" @change="onFileSelect($event)">
+                                        <p>{{ mat_thumbnail }}</p>
+                                    </div>
+                                </div>
+                            </fieldset>
+                            <fieldset class="maps">
+                                <div>
+                                    <span>Diffuse:</span>
+                                    <input type="file" name="diffuse" @change="onFileSelect($event)">
+                                </div>
+                                <div :style="{display: showMetallic}">
+                                    <span>Metallic</span>
+                                    <input type="file" name="metallic" @change="onFileSelect($event)">
+                                </div>
+                                <div :style="{display: showSpecular}">
+                                    <span>Specular:</span>
+                                    <input type="file" name="specular" @change="onFileSelect($event)">
+                                </div>
+                                <div>
+                                    <span>Roughness/Gloss:</span>
+                                    <input type="file" name="roughness" @change="onFileSelect($event)">
+                                </div>
+                                <div>
+                                    <span>Normal:</span>
+                                    <input type="file" name="normal" @change="onFileSelect($event)">
+                                </div>
+                                <div>
+                                    <span>Bump:</span>
+                                    <input type="file" name="bump" @change="onFileSelect($event)">
+                                </div>
+                                <div>
+                                    <span>Displacement:</span>
+                                    <input type="file" name="displacement" @change="onFileSelect($event)">
+                                </div>
+                            </fieldset>
+                        </form>
+                        <button @click="updateMaterial">SAVE</button>
+                        <button id="cancel-edit" @click="toggleEditMode">CANCEL</button>
+                        <p v-if="errs.maps" class="error">{{ errs.maps }}</p>
+                    </template>
+                    <!-- End Edit mode -->
+                </div>
+            </div>
+            <!-- End Material Details -->
+
+            <!-- Begin New Material -->
+            <div v-cloak id="new-material" v-if="createModalVisible" @click.self="resetVue(false)">
+                <form enctype="multipart/form-data">
+                    <span class="close" @click="toggleCreateModal">&#9587;</span>
+                    <!-- <button id="debug" @click.prevent="debug">DEBUG</button> -->
+                    <fieldset class="form-metadata">
+                        <div class="form-text">
+                            <div>
+                                <span>Name:</span>
+                                <input type="text" v-model="mat_name">
+                                <p v-if="errs.name" class="error">{{ errs.name }}</p>
+                            </div>
+                            <div>
+                                <span>Resolution</span>
+                                <select v-model="mat_resolution">
+                                    <option disabled>Choose a resolution</option>
+                                    <option value="1k">1K</option>
+                                    <option value="2k">2K</option>
+                                    <option value="4k">4K</option>
+                                </select>
+                                <p v-if="errs.resolution" class="error">{{ errs.resolution }}</p>
+                            </div>
+                            <div>
+                                <span>Tags:</span>
+                                <input type="text" class="long" v-model="mat_tags">
+                            </div>
+                            <div>
+                                <span>Workflow:</span>
+                                <select v-model="mat_workflow">
+                                    <option disabled>Choose a workflow</option>
+                                    <option value="metallic">Metallic</option>
+                                    <option value="specular">Specular</option>
+                                </select>
+                                <p v-if="errs.workflow" class="error">{{ errs.workflow }}</p>
+                            </div>
+                        </div>
+                        <div class="form-img">
+                            <div class="upload-thumbnail">
+                                <label for="form-thumbnail">
+                                    <img src="thumbnail.png" alt="thumbnail">
+                                </label>
+                                <input id="form-thumbnail" type="file" name="thumbnail" @change="onFileSelect($event)">
+                                <p>{{ mat_thumbnail }}</p>
+                            </div>
+                        </div>
+                    </fieldset>
+                    <fieldset class="maps">
+                        <div>
+                            <span>Diffuse:</span>
+                            <input type="file" name="diffuse" @change="onFileSelect($event)">
+                        </div>
+                        <div :style="{display: showMetallic}">
+                            <span>Metallic</span>
+                            <input type="file" name="metallic" @change="onFileSelect($event)">
+                        </div>
+                        <div :style="{display: showSpecular}">
+                            <span>Specular:</span>
+                            <input type="file" name="specular" @change="onFileSelect($event)">
+                        </div>
+                        <div>
+                            <span>Roughness/Gloss:</span>
+                            <input type="file" name="roughness" @change="onFileSelect($event)">
+                        </div>
+                         <div>
+                            <span>Normal:</span>
+                            <input type="file" name="normal" @change="onFileSelect($event)">
+                        </div>
+                        <div>
+                            <span>Bump:</span>
+                            <input type="file" name="bump" @change="onFileSelect($event)">
+                        </div>
+                        <div>
+                            <span>Displacement:</span>
+                            <input type="file" name="displacement" @change="onFileSelect($event)">
+                        </div>
+                    </fieldset>
+                    <button type="submit" @click.prevent="addMaterial">Submit</button>
+                    <p v-if="errs.maps" class="error">{{ errs.maps }}</p>
+                </form>
+            </div>
+            <!-- End New Material -->
+        </div>
+    </body>
+    <script src="https://cdn.jsdelivr.net/npm/vue@2/dist/vue.js"></script>
+    <script src="script.js"></script>
+</html>
